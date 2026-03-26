@@ -6,10 +6,28 @@ from app.database import get_db
 from app.core.config import settings
 from app.models.user import User
 from app.schemas.user import TokenPayload
+from typing import Optional
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
 
 def get_current_user(
+    db: Session = Depends(get_db), token: Optional[str] = Depends(oauth2_scheme)
+) -> Optional[User]:
+    if token is None:
+        return None
+    try:
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        token_data = TokenPayload(**payload)
+        if token_data.sub is None:
+            return None
+    except JWTError:
+        return None
+    user = db.query(User).filter(User.id == int(token_data.sub)).first()
+    return user
+
+def get_current_user_required(
     db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)
 ) -> User:
     credentials_exception = HTTPException(

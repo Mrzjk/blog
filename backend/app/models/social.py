@@ -16,7 +16,10 @@ class Message(Base):
     sender_id = Column(Integer, ForeignKey("users.id"), index=True)
     receiver_id = Column(Integer, ForeignKey("users.id"), index=True)
     content = Column(Text, nullable=False)
+    message_type = Column(String(20), default="text") # text, image, emoji, file
     is_read = Column(Boolean, default=False)
+    deleted_by_sender = Column(Boolean, default=False)
+    deleted_by_receiver = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class Notification(Base):

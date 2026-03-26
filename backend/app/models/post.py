@@ -1,22 +1,40 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Table
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
+
+post_tags = Table(
+    "post_tags",
+    Base.metadata,
+    Column("post_id", Integer, ForeignKey("posts.id"), primary_key=True),
+    Column("tag_id", Integer, ForeignKey("tags.id"), primary_key=True),
+)
+
+class Category(Base):
+    __tablename__ = "categories"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), unique=True, index=True, nullable=False)
+    description = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 class Post(Base):
     __tablename__ = "posts"
     id = Column(Integer, primary_key=True, index=True)
     author_id = Column(Integer, ForeignKey("users.id"))
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     title = Column(String(255), nullable=False)
     content = Column(Text, nullable=False)
     cover_image = Column(String(255), nullable=True)
+    status = Column(String(20), default="published") # draft, published, deleted
     views = Column(Integer, default=0)
     likes = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     author = relationship("User", backref="posts")
+    category = relationship("Category", backref="posts")
     comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")
     likers = relationship("PostLike", back_populates="post", cascade="all, delete-orphan")
+    tags = relationship("Tag", secondary=post_tags, back_populates="posts")
 
 class Comment(Base):
     __tablename__ = "comments"
@@ -42,3 +60,22 @@ class PostLike(Base):
 
     post = relationship("Post", back_populates="likers")
     user = relationship("User")
+
+class PostBookmark(Base):
+    __tablename__ = "post_bookmarks"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    post_id = Column(Integer, ForeignKey("posts.id"), index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    post = relationship("Post")
+    user = relationship("User")
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), unique=True, index=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    posts = relationship("Post", secondary=post_tags, back_populates="tags")

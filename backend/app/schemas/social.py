@@ -13,6 +13,8 @@ class FriendshipResponse(BaseModel):
     class Config:
         from_attributes = True
 
+from datetime import datetime
+
 class NotificationResponse(BaseModel):
     id: int
     user_id: int
@@ -20,7 +22,7 @@ class NotificationResponse(BaseModel):
     type: str
     content: Optional[str]
     is_read: bool
-    created_at: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -30,6 +32,7 @@ class MessageResponse(BaseModel):
     sender_id: int
     receiver_id: int
     content: str
+    message_type: str
     is_read: bool
     created_at: str
 

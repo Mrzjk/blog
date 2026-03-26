@@ -17,6 +17,7 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     avatar = Column(String(255), default="default.jpg")
     bio = Column(String(255), nullable=True)
+    birthday = Column(DateTime, nullable=True)
     level = Column(Integer, default=1)
     exp = Column(Integer, default=0)
     role_id = Column(Integer, ForeignKey("roles.id"), default=1)

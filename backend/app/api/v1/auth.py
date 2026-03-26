@@ -3,7 +3,7 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api import deps
 from app.core import security
@@ -14,14 +14,14 @@ from app.schemas.user import UserCreate, UserResponse, Token, UserUpdate
 router = APIRouter()
 
 def calculate_exp_for_level(level: int) -> int:
-    return 10 * (2 ** (level - 1))
+    return 10 * (2 ** (max(1, level) - 1))
 
-def check_level_up(user: User) -> bool:
-    total_exp_needed = sum(calculate_exp_for_level(l) for l in range(1, user.level + 1))
-    if user.exp >= total_exp_needed:
+def total_exp_needed_for_next_level(level: int) -> int:
+    return sum(calculate_exp_for_level(l) for l in range(1, max(1, level) + 1))
+
+def apply_level_up(user: User) -> None:
+    while user.exp >= total_exp_needed_for_next_level(user.level):
         user.level += 1
-        return True
-    return False
 
 @router.post("/login", response_model=Token)
 def login_access_token(
@@ -87,7 +87,7 @@ def register(
 
 @router.get("/me", response_model=UserResponse)
 def read_user_me(
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_user_required),
 ) -> Any:
     return current_user
 
@@ -96,52 +96,59 @@ def update_user_me(
     *,
     db: Session = Depends(deps.get_db),
     user_in: UserUpdate,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_user_required),
 ) -> Any:
-    user = db.query(User).filter(User.id == current_user.id).first()
-
-    if user_in.email is not None:
-        email_exists = db.query(User).filter(
-            User.email == user_in.email.strip().lower(),
-            User.id != current_user.id
-        ).first()
-        if email_exists:
+    if user_in.email and user_in.email != current_user.email:
+        user = db.query(User).filter(User.email == user_in.email).first()
+        if user:
             raise HTTPException(status_code=400, detail="邮箱已被使用")
-        user.email = user_in.email.strip().lower()
-    if user_in.username is not None:
-        username_exists = db.query(User).filter(
-            User.username == user_in.username.strip(),
-            User.id != current_user.id
-        ).first()
-        if username_exists:
-            raise HTTPException(status_code=400, detail="用户名已存在")
-        user.username = user_in.username.strip()
-    if user_in.bio is not None:
-        user.bio = user_in.bio.strip()
-    if user_in.avatar is not None:
-        user.avatar = user_in.avatar
-    if user_in.password is not None:
-        user.hashed_password = security.get_password_hash(user_in.password)
+    
+    if user_in.username and user_in.username != current_user.username:
+        user = db.query(User).filter(User.username == user_in.username).first()
+        if user:
+            raise HTTPException(status_code=400, detail="用户名已被使用")
 
+    update_data = user_in.dict(exclude_unset=True)
+    if "password" in update_data and update_data["password"]:
+        hashed_password = security.get_password_hash(update_data["password"])
+        current_user.hashed_password = hashed_password
+        del update_data["password"]
+    
+    for field, value in update_data.items():
+        if hasattr(current_user, field):
+            setattr(current_user, field, value)
+
+    db.add(current_user)
     db.commit()
-    db.refresh(user)
-    return user
+    db.refresh(current_user)
+    
+    user_with_role = db.query(User).options(joinedload(User.role)).filter(User.id == current_user.id).first()
+    return user_with_role
 
 @router.post("/heartbeat")
 def heartbeat(
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_user_required),
 ) -> Any:
     user = db.query(User).filter(User.id == current_user.id).first()
     now = datetime.utcnow()
 
-    if user.last_active:
-        minutes_passed = (now - user.last_active).total_seconds() / 60
-        if minutes_passed >= 10:
-            user.exp += 1
-            check_level_up(user)
+    if not user.last_active:
+        user.last_active = now
+        db.commit()
+        db.refresh(user)
+        return {
+            "exp": user.exp,
+            "level": user.level,
+            "exp_for_next_level": calculate_exp_for_level(user.level)
+        }
 
-    user.last_active = now
+    minutes_passed = (now - user.last_active).total_seconds() / 60
+    gained = int(minutes_passed // 10)
+    if gained > 0:
+        user.exp += gained
+        user.last_active = user.last_active + timedelta(minutes=gained * 10)
+        apply_level_up(user)
     db.commit()
     db.refresh(user)
     return {
@@ -150,7 +157,7 @@ def heartbeat(
         "exp_for_next_level": calculate_exp_for_level(user.level)
     }
 
-@router.get("/{user_id}", response_model=UserResponse)
+@router.get("/user/{user_id}", response_model=UserResponse)
 def read_user_by_id(
     user_id: int,
     db: Session = Depends(deps.get_db),
@@ -171,3 +178,55 @@ def search_users(
         User.username.contains(q)
     ).offset(skip).limit(limit).all()
     return users
+
+@router.get("/users")
+def list_users(
+    db: Session = Depends(deps.get_db),
+    skip: int = 0,
+    limit: int = 50,
+    current_user: User = Depends(deps.get_current_user_required),
+) -> Any:
+    is_admin = current_user.role and current_user.role.name == "admin"
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    users = db.query(User).offset(skip).limit(limit).all()
+    return users
+
+@router.put("/users/{user_id}/ban")
+def ban_user(
+    user_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user_required),
+) -> Any:
+    is_admin = current_user.role and current_user.role.name == "admin"
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    if target_user.role and target_user.role.name == "admin":
+        raise HTTPException(status_code=400, detail="无法封禁管理员")
+
+    target_user.is_active = False
+    db.commit()
+    return {"message": f"用户 {target_user.username} 已被封禁"}
+
+@router.put("/users/{user_id}/unban")
+def unban_user(
+    user_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user_required),
+) -> Any:
+    is_admin = current_user.role and current_user.role.name == "admin"
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    target_user.is_active = True
+    db.commit()
+    return {"message": f"用户 {target_user.username} 已解封"}
