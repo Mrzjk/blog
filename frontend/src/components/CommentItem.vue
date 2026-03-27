@@ -2,8 +2,9 @@
   <div class="comment-item" :class="{ 'is-reply': isReply }">
     <div class="comment-card__header">
       <div class="comment-author-info">
-        <div class="author-avatar-small">{{ comment.author?.username?.charAt(0)?.toUpperCase() || 'U' }}</div>
-        <strong>{{ comment.author?.username }}</strong>
+        <div class="author-avatar-small" @click="goToUserProfile(comment.author?.id)" style="cursor: pointer">{{ comment.author?.username?.charAt(0)?.toUpperCase() || 'U' }}</div>
+        <strong @click="goToUserProfile(comment.author?.id)" style="cursor: pointer">{{ comment.author?.username }}</strong>
+        <span class="muted author-level" style="font-size: 12px; margin-left: 4px;">Lv.{{ comment.author?.level || 1 }}</span>
         <span v-if="replyToUser" class="reply-to">回复 <span class="highlight">@{{ replyToUser }}</span></span>
       </div>
       <div class="comment-actions">
@@ -36,6 +37,9 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const props = defineProps({
   comment: {
@@ -91,6 +95,12 @@ const canDelete = computed(() => {
 })
 
 const formatDate = value => new Date(value).toLocaleString('zh-CN')
+
+const goToUserProfile = (userId) => {
+  if (userId) {
+    router.push(`/user/${userId}`)
+  }
+}
 </script>
 
 <style scoped>

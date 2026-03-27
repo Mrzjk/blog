@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 class UserBase(BaseModel):
@@ -16,6 +16,7 @@ class UserCreate(UserBase):
 
 class UserUpdate(UserBase):
     password: Optional[str] = Field(default=None, min_length=6, max_length=64)
+    exp: Optional[int] = None
 
 class RoleResponse(BaseModel):
     id: int
@@ -31,6 +32,9 @@ class UserInDBBase(UserBase):
     exp: int
     role_id: int
     is_active: bool
+    is_muted: Optional[bool] = False
+    muted_until: Optional[datetime] = None
+    banned_until: Optional[datetime] = None
     created_at: datetime
     last_active: Optional[datetime] = None
     role: Optional[RoleResponse] = None
@@ -48,3 +52,7 @@ class Token(BaseModel):
 
 class TokenPayload(BaseModel):
     sub: Optional[str] = None
+
+class PaginatedUserResponse(BaseModel):
+    total: int
+    items: List[UserResponse]

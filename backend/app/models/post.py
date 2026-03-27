@@ -26,6 +26,7 @@ class Post(Base):
     content = Column(Text, nullable=False)
     cover_image = Column(String(255), nullable=True)
     status = Column(String(20), default="published") # draft, published, deleted
+    type = Column(String(20), default="blog") # blog, forum
     views = Column(Integer, default=0)
     likes = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -42,6 +43,7 @@ class Comment(Base):
     post_id = Column(Integer, ForeignKey("posts.id"))
     author_id = Column(Integer, ForeignKey("users.id"))
     parent_id = Column(Integer, ForeignKey("comments.id"), nullable=True)
+    reply_to_user = Column(String(50), nullable=True) # New field to store the username being replied to
     content = Column(String(500), nullable=False)
     likes = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -76,6 +78,8 @@ class Tag(Base):
     __tablename__ = "tags"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), unique=True, index=True, nullable=False)
+    color = Column(String(20), nullable=True, default="#409EFF")
+    description = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     posts = relationship("Post", secondary=post_tags, back_populates="tags")

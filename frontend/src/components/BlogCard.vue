@@ -4,10 +4,20 @@
       <el-popover placement="bottom-start" :width="280" trigger="hover" @show="$emit('load-user-stats', post.author?.id)">
         <template #reference>
           <div class="feed-card__author" @click.stop>
-            <div class="author-avatar">{{ post.author?.username?.charAt(0)?.toUpperCase() || 'U' }}</div>
+            <div class="author-avatar" @click="goToUserProfile(post.author?.id)" style="cursor: pointer">{{ post.author?.username?.charAt(0)?.toUpperCase() || 'U' }}</div>
             <div class="author-info">
-              <span class="author-name">{{ post.author?.username }}</span>
-              <span class="muted author-level">Lv.{{ post.author?.level || 1 }}</span>
+              <span class="author-name" @click="goToUserProfile(post.author?.id)" style="cursor: pointer">{{ post.author?.username }}</span>
+              <div class="level-indicator">
+                <span class="muted author-level">Lv.{{ post.author?.level || 1 }}</span>
+                <el-progress 
+                  v-if="post.author?.exp !== undefined"
+                  :percentage="getExpPercentage(post.author.level, post.author.exp)" 
+                  :show-text="false" 
+                  :stroke-width="4"
+                  class="level-progress-mini"
+                  color="var(--accent-primary)"
+                />
+              </div>
             </div>
           </div>
         </template>
@@ -119,6 +129,27 @@ const formatDate = value => {
   
   return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
+
+const getExpPercentage = (level, exp) => {
+  level = level || 1;
+  exp = exp || 0;
+  let expToCurrentLevel = 0;
+  for (let i = 1; i < level; i++) {
+    expToCurrentLevel += i * 10;
+  }
+  
+  const expForNextLevel = level * 10;
+  const currentLevelExp = exp - expToCurrentLevel;
+  
+  const percentage = (currentLevelExp / expForNextLevel) * 100;
+  return Math.min(100, Math.max(0, percentage));
+};
+
+const goToUserProfile = (userId) => {
+  if (userId) {
+    router.push(`/user/${userId}`)
+  }
+}
 </script>
 
 <style scoped>
@@ -156,6 +187,16 @@ const formatDate = value => {
 
 .author-level {
   font-size: 12px;
+}
+
+.level-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.level-progress-mini {
+  width: 60px;
 }
 
 .feed-card__date {

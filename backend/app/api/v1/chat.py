@@ -125,6 +125,7 @@ def get_friends(
                 "id": friend.id,
                 "username": friend.username,
                 "avatar": friend.avatar,
+                "level": friend.level,
                 "online": friend.id in manager.active_connections,
                 "last_message": last_msg.content if last_msg else None,
                 "last_message_time": last_msg.created_at if last_msg else None,

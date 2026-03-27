@@ -6,7 +6,7 @@ from app.api.v1.api import api_router
 from app.core.config import settings
 from app.database import engine, Base
 
-from app.models import user, post, social, game
+from app.models import user, post, social, game, setting
 import os
 
 app = FastAPI(title=settings.PROJECT_NAME, version="1.0.0")

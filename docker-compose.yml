@@ -1,21 +1,27 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: blog_social
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
 
-  redis:
-    image: redis:alpine
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
-      - "6379:6379"
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=sqlite:///./blog_social.db
+    volumes:
+      - backend_data:/app
+    restart: always
 
 volumes:
-  pgdata:
+  backend_data:

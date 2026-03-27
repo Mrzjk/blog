@@ -3,12 +3,17 @@ import random
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from app.database import SessionLocal
+from app.database import SessionLocal, engine
 from app.models.user import User, Role
 from app.models.post import Post, Category, Tag
+from app.models.social import Message, Notification
 from app.core.security import get_password_hash
+from app.database import Base
 
 def seed_db():
+    # First, ensure all tables are created
+    Base.metadata.create_all(bind=engine)
+    
     db = SessionLocal()
     
     # 1. Create categories
@@ -36,32 +41,47 @@ def seed_db():
         tags.append(tag)
 
     # 3. Ensure a user exists
-    user = db.query(User).filter(User.username == "admin").first()
-    if not user:
-        role = db.query(Role).filter(Role.name == "admin").first()
-        if not role:
-            role = Role(name="admin", permissions="all")
-            db.add(role)
-            db.commit()
-            db.refresh(role)
-            
-        user = User(
-            username="admin",
-            email="admin@example.com",
-            hashed_password=get_password_hash("123456"),
-            role_id=role.id,
-            bio="系统管理员，技术爱好者。"
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+    # Clear existing users first to meet requirement
+    db.execute(text("DELETE FROM post_tags"))
+    db.execute(text("DELETE FROM posts"))
+    db.execute(text("DELETE FROM users"))
+    db.execute(text("DELETE FROM roles"))
+    db.commit()
+
+    # Create roles
+    admin_role = Role(name="admin", permissions="all")
+    user_role = Role(name="user", permissions="read,write")
+    db.add_all([admin_role, user_role])
+    db.commit()
+    db.refresh(admin_role)
+    db.refresh(user_role)
+    
+    # Create root admin
+    root_user = User(
+        username="root",
+        email="root@example.com",
+        hashed_password=get_password_hash("root"),
+        role_id=admin_role.id,
+        bio="System Administrator"
+    )
+    
+    # Create test user
+    test_user = User(
+        username="test",
+        email="test@example.com",
+        hashed_password=get_password_hash("test123"),
+        role_id=user_role.id,
+        bio="Test User"
+    )
+    
+    db.add_all([root_user, test_user])
+    db.commit()
+    db.refresh(root_user)
+    db.refresh(test_user)
+    
+    user = root_user # Use root user for post creation
 
     try:
-        # 4. Create 12 mock posts
-        # Note: Do not delete existing tags or categories here, just the posts and post_tags
-        db.execute(text("DELETE FROM post_tags"))
-        db.execute(text("DELETE FROM posts"))
-        db.commit()
         
         # We don't delete tags, just reuse them
         

@@ -22,6 +22,9 @@ class User(Base):
     exp = Column(Integer, default=0)
     role_id = Column(Integer, ForeignKey("roles.id"), default=1)
     is_active = Column(Boolean, default=True)
+    is_muted = Column(Boolean, default=False)
+    muted_until = Column(DateTime, nullable=True)
+    banned_until = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_active = Column(DateTime, default=datetime.utcnow)
 

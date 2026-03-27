@@ -1,11 +1,12 @@
 <template>
-  <el-config-provider>
-    <AppShell>
-      <router-view />
-    </AppShell>
-  </el-config-provider>
+  <router-view />
+  <AuthModal />
 </template>
 
-<script setup>
-import AppShell from './components/AppShell.vue'
+<script setup lang="ts">
+import AuthModal from '@/components/user/AuthModal.vue';
 </script>
+
+<style>
+/* Global styles could be placed here or in style.css */
+</style>

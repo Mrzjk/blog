@@ -8,14 +8,36 @@ from app.schemas.category import CategoryCreate, CategoryResponse, CategoryUpdat
 
 router = APIRouter()
 
-@router.get("/", response_model=List[CategoryResponse])
+@router.get("/", response_model=Any)
 def read_categories(
     db: Session = Depends(deps.get_db),
     skip: int = 0,
     limit: int = 100,
 ) -> Any:
-    categories = db.query(Category).offset(skip).limit(limit).all()
-    return categories
+    from sqlalchemy import func
+    from app.models.post import Post
+    
+    rows = (
+        db.query(Category, func.count(Post.id))
+        .outerjoin(Post, Category.id == Post.category_id)
+        .group_by(Category.id)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    
+    result = []
+    for cat, count in rows:
+        cat_dict = {
+            "id": cat.id,
+            "name": cat.name,
+            "description": cat.description,
+            "created_at": cat.created_at,
+            "count": count
+        }
+        result.append(cat_dict)
+        
+    return result
 
 @router.post("/", response_model=CategoryResponse)
 def create_category(

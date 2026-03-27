@@ -13,9 +13,22 @@ class CategoryResponse(BaseModel):
     class Config:
         from_attributes = True
 
-class TagResponse(BaseModel):
-    id: int
+class TagBase(BaseModel):
     name: str
+    color: Optional[str] = "#409EFF"
+    description: Optional[str] = None
+
+class TagCreate(TagBase):
+    pass
+
+class TagUpdate(BaseModel):
+    name: Optional[str] = None
+    color: Optional[str] = None
+    description: Optional[str] = None
+
+class TagResponse(TagBase):
+    id: int
+    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -23,6 +36,7 @@ class TagResponse(BaseModel):
 class CommentBase(BaseModel):
     content: str
     parent_id: Optional[int] = None
+    reply_to_user: Optional[str] = None
 
 class CommentCreate(CommentBase):
     post_id: int
@@ -44,6 +58,7 @@ class PostBase(BaseModel):
     content: str
     cover_image: Optional[str] = None
     status: str = "published"
+    type: str = "blog"
     category_id: Optional[int] = None
 
 class PostCreate(PostBase):
@@ -60,9 +75,15 @@ class PostResponse(PostBase):
     tags: List[TagResponse] = []
     is_liked: bool = False
     is_bookmarked: bool = False
+    comments_count: Optional[int] = 0
 
     class Config:
         from_attributes = True
 
 class PostDetailResponse(PostResponse):
     comments: List[CommentResponse] = []
+
+class PaginatedPostResponse(BaseModel):
+    total: int
+    items: List[PostResponse]
+
