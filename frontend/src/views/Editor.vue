@@ -3,7 +3,15 @@
     <div class="editor-header">
       <el-input v-model="post.title" placeholder="输入文章标题..." class="title-input" />
       <div class="editor-actions">
-        <el-input v-model="tagsInput" placeholder="标签(逗号分隔)" style="width: 200px" />
+        <el-select v-model="post.category_id" placeholder="选择分类" style="width: 150px">
+          <el-option
+            v-for="cat in categories"
+            :key="cat.id"
+            :label="cat.name"
+            :value="cat.id"
+          />
+        </el-select>
+        <el-input v-model="tagsInput" placeholder="标签(使用英文;分隔)" style="width: 200px" />
         <el-button @click="router.push('/')">取消</el-button>
         <el-button type="primary" :loading="publishing" @click="publishPost">发布文章</el-button>
       </div>
@@ -34,7 +42,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '../utils/request'
 import { ElMessage } from 'element-plus'
@@ -45,10 +53,21 @@ const router = useRouter()
 const post = ref({
   title: '',
   content: '',
-  cover_image: ''
+  cover_image: '',
+  category_id: null
 })
 const tagsInput = ref('')
 const publishing = ref(false)
+const categories = ref([])
+
+onMounted(async () => {
+  try {
+    const { data } = await request.get('/categories/')
+    categories.value = data
+  } catch (error) {
+    console.error('获取分类失败', error)
+  }
+})
 
 const uploadHeaders = computed(() => {
   const token = localStorage.getItem('token')
@@ -90,10 +109,13 @@ const publishPost = async () => {
   if (!post.value.title || !post.value.content) {
     return ElMessage.warning('请填写标题和内容')
   }
+  if (!post.value.category_id) {
+    return ElMessage.warning('请选择文章分类')
+  }
   publishing.value = true
   try {
     const tagNames = tagsInput.value
-      .split(',')
+      .split(';')
       .map(v => v.trim())
       .filter(Boolean)
       .slice(0, 8)
